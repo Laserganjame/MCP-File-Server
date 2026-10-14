@@ -1,0 +1,36 @@
+﻿MCP FILE SERVER — DECISIONS
+
+1. WORKSPACE SANDBOX
+Decision: All file tools operate relative to the workspace directory.
+Reason: Prevent agents from freely accessing files outside the project workspace.
+Requirement: Continue testing traversal and symlink-related edge cases.
+
+2. TRANSPORT
+Decision: Use MCP Streamable HTTP.
+Reason: Supports the required HTTP-based MCP server and remote client connection.
+
+3. AUTHENTICATION
+Decision: Protect /mcp with a Bearer token supplied through MCP_AUTH_TOKEN.
+Reason: File tools can create, modify, move, and delete files.
+Rule: Never commit the real token or publish it in logs, screenshots, or documentation.
+
+4. LOCAL BINDING
+Decision: Bind the HTTP server to 127.0.0.1.
+Reason: The local service should be reached through the intended tunnel rather than exposed directly on every network interface.
+
+5. TOOL DESIGN
+Decision: Keep nine tools, including str_replace.
+Reason: The tools support file management, search, inspection, and targeted text editing.
+Rule: str_replace requires exactly one occurrence of the target text.
+
+6. VERSION CONTROL
+Decision: Use Git and create meaningful commits as milestones are completed.
+Rule: Do not fabricate historical commits. Do not push directly to main if a separate feature branch is required by the workflow.
+
+7. DEPLOYMENT
+Decision: Use an HTTPS tunnel and a process manager, subject to compatibility testing.
+Status: Final tunnel and process-manager configuration not yet selected or verified.
+
+8. DOCUMENTATION
+Decision: Keep project state, progress, checkpoints, and design decisions in separate handoff files.
+Reason: Allow another AI agent or session to resume work reliably.

@@ -1,0 +1,41 @@
+﻿PROJECT: MCP File Server
+STATUS: Local implementation working; deployment and documentation pending.
+
+PURPOSE
+Provide an AI agent with authenticated MCP tools for managing files inside a restricted workspace.
+
+TECH STACK
+- Node.js and TypeScript
+- MCP TypeScript SDK
+- Express
+- Zod
+- Streamable HTTP transport
+
+CURRENT IMPLEMENTATION
+- Eight original tools plus str_replace (nine total).
+- Local HTTP endpoint: http://127.0.0.1:3000/mcp
+- Health endpoint: http://127.0.0.1:3000/health
+- Bearer-token authentication using MCP_AUTH_TOKEN.
+- Workspace root: workspace/
+- MCP Inspector successfully connected and tested all nine tools.
+- Path traversal attempts were rejected in earlier tests.
+- TypeScript check passed using npx.cmd tsc --noEmit.
+
+GIT HISTORY
+- 33ffc95: feat: add safe exact-text replacement tool
+- bf58023: establish working MCP file server baseline
+
+CURRENT LIMITATIONS
+- HTTPS tunnel and PM2 process management are not yet completed.
+- Required handoff files created and verified.
+- README and documentation paper are pending.
+- Multi-step demonstration across at least two agent sessions is pending.
+- Further security review and final deployment testing are required.
+
+NEXT PRIORITIES
+1. Complete and verify handoff files.
+2. Review tool security and test edge cases.
+3. Configure HTTPS tunnel and PM2.
+4. Publish the reviewed repository to GitHub.
+5. Complete a multi-session agent demonstration and save evidence.
+6. Finish the README and documentation paper.

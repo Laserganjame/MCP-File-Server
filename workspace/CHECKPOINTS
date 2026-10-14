@@ -1,0 +1,48 @@
+﻿MCP FILE SERVER — CHECKPOINTS
+
+CHECKPOINT 1 — BASELINE
+Status: PASSED
+- Git repository initialized.
+- Baseline commit created: bf58023.
+- TypeScript check passed.
+- Eight initial tools registered.
+
+CHECKPOINT 2 — LOCAL MCP TESTING
+Status: PASSED
+- Streamable HTTP server started locally.
+- Bearer-token authentication verified.
+- Unauthenticated request rejected.
+- MCP Inspector connected successfully.
+- All eight original tools tested.
+
+CHECKPOINT 3 — STR_REPLACE
+Status: PASSED
+- Ninth tool registered.
+- TypeScript check passed.
+- Successful exact-text replacement tested.
+- Missing target rejected without changing the file.
+- Commit created: 33ffc95.
+
+CHECKPOINT 4 — HANDOFF FILES
+Status: PASSED
+- All four handoff files created and verified.
+
+CHECKPOINT 5 — PUBLIC DEPLOYMENT
+Status: NOT STARTED
+- HTTPS tunnel
+- PM2 process management
+- Public endpoint authentication test
+- Remote MCP client test
+
+CHECKPOINT 6 — MULTI-SESSION DEMO
+Status: NOT STARTED
+- Complete one multi-step task across at least two agent sessions.
+- Verify the second session can continue using workspace handoff files.
+- Save transcript and logs.
+
+CHECKPOINT 7 — FINAL SUBMISSION
+Status: NOT STARTED
+- Public GitHub repository.
+- README.
+- Documentation paper.
+- Final security review and demonstration evidence.

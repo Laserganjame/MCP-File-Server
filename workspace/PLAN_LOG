@@ -1,0 +1,33 @@
+﻿MCP FILE SERVER — PLAN LOG
+
+COMPLETED
+- Initialized Git repository on main.
+- Added .gitignore to exclude node_modules, build output, environment files, and backups.
+- Implemented and tested eight initial MCP tools.
+- Implemented authenticated Streamable HTTP transport.
+- Verified that unauthenticated requests are rejected.
+- Connected MCP Inspector to the local HTTP endpoint.
+- Tested all eight original tools.
+- Added str_replace with exact-match validation.
+- Tested successful replacement and missing-target rejection.
+- Created Git commits:
+  - bf58023: establish working MCP file server baseline
+  - 33ffc95: add safe exact-text replacement tool
+
+COMPLETED
+- Created and reviewed PROJECT_STATE, PLAN_LOG, CHECKPOINTS, and DECISIONS.
+
+IN PROGRESS
+- Security review before public deployment.
+
+PLANNED
+- Review path validation and file-operation edge cases.
+- Configure and test an HTTPS tunnel.
+- Configure PM2 to manage the server process.
+- Publish the repository to GitHub after checking for secrets.
+- Demonstrate a multi-step task across at least two agent sessions.
+- Save transcripts and logs as grading evidence.
+- Complete README and documentation paper.
+
+RULE
+Record meaningful completed work and test results here. Do not mark a task complete until it has been verified.
