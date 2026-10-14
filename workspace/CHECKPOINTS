@@ -46,3 +46,10 @@ Status: NOT STARTED
 - README.
 - Documentation paper.
 - Final security review and demonstration evidence.
+
+CHECKPOINT 8 — LOCAL SECURITY AUDIT
+Status: PASSED
+- All nine tools registered through an in-memory MCP client.
+- Normal operations, path traversal rejection, outside-workspace symlink rejection, and no-overwrite move behavior tested.
+- `npx.cmd tsc --noEmit` and `npm.cmd test` passed.
+- HTTP tunnel deployment and a real remote-client test remain out of scope for this checkpoint.

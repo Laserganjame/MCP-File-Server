@@ -1,12 +1,52 @@
 
 import express from "express";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { createMcpServer } from "./tools.js";
 
 const app = express();
 const PORT = 3000;
+
+function hasValidToken(authorization: string | undefined, expectedToken: string): boolean {
+  const suppliedToken = authorization?.startsWith("Bearer ")
+    ? authorization.slice("Bearer ".length)
+    : "";
+  const supplied = Buffer.from(suppliedToken);
+  const expected = Buffer.from(expectedToken);
+
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
+}
+
+function isAllowedOrigin(origin: string): boolean {
+  const allowedOrigins = (process.env.MCP_ALLOWED_ORIGINS?.split(",") ?? [])
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  try {
+    const parsedOrigin = new URL(origin);
+    const isLocalOrigin =
+      parsedOrigin.protocol === "http:" &&
+      (parsedOrigin.hostname === "localhost" ||
+        parsedOrigin.hostname === "127.0.0.1" ||
+        parsedOrigin.hostname === "[::1]");
+
+    if (isLocalOrigin) {
+      return true;
+    }
+
+    const normalizedOrigin = parsedOrigin.origin;
+    return allowedOrigins.some((allowedOrigin) => {
+      try {
+        return normalizedOrigin === new URL(allowedOrigin).origin;
+      } catch {
+        return false;
+      }
+    });
+  } catch {
+    return false;
+  }
+}
 
 app.use(express.json({ limit: "1mb" }));
 
@@ -21,7 +61,7 @@ app.use("/mcp", (req, res, next) => {
     return;
   }
 
-  if (authorization !== `Bearer ${expectedToken}`) {
+  if (!hasValidToken(authorization, expectedToken)) {
     res.status(401).json({
       error: "Unauthorized"
     });
@@ -39,30 +79,14 @@ app.use("/mcp", (req, res, next) => {
     return;
   }
 
-  try {
-    const parsedOrigin = new URL(origin);
-
-    const isLocalOrigin =
-      parsedOrigin.protocol === "http:" &&
-      (
-        parsedOrigin.hostname === "localhost" ||
-        parsedOrigin.hostname === "127.0.0.1" ||
-        parsedOrigin.hostname === "[::1]"
-      );
-
-    if (!isLocalOrigin) {
-      res.status(403).json({
-        error: "Forbidden: Origin not allowed."
-      });
-      return;
-    }
-
-    next();
-  } catch {
+  if (!isAllowedOrigin(origin)) {
     res.status(403).json({
-      error: "Forbidden: Invalid Origin header."
+      error: "Forbidden: Origin not allowed."
     });
+    return;
   }
+
+  next();
 });
 
 const transports = new Map<string, StreamableHTTPServerTransport>();

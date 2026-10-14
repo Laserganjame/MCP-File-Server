@@ -20,6 +20,7 @@ CURRENT IMPLEMENTATION
 - MCP Inspector successfully connected and tested all nine tools.
 - Path traversal attempts were rejected in earlier tests.
 - TypeScript check passed using npx.cmd tsc --noEmit.
+- Security audit verified locally on 2026-10-15: all nine tools register, traversal and outside-workspace symlink attempts are rejected, and move_file preserves an existing destination.
 
 GIT HISTORY
 - 33ffc95: feat: add safe exact-text replacement tool
@@ -30,7 +31,8 @@ CURRENT LIMITATIONS
 - Required handoff files created and verified.
 - README and documentation paper are pending.
 - Multi-step demonstration across at least two agent sessions is pending.
-- Further security review and final deployment testing are required.
+- Final deployment and remote-client security testing are required.
+- Filesystem path checks cannot eliminate every time-of-check/time-of-use race if an untrusted local process can modify the workspace concurrently. Keep workspace write access limited to the server account and trusted users.
 
 NEXT PRIORITIES
 1. Complete and verify handoff files.

@@ -1,12 +1,78 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mkdir, readFile, readdir, realpath, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { link, lstat, mkdir, readFile, readdir, realpath, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const WORKSPACE = await realpath(path.resolve("workspace"));
 
+function isInsideWorkspace(target: string): boolean {
+  const relative = path.relative(WORKSPACE, target);
+
+  return (
+    relative === "" ||
+    (!relative.startsWith(".." + path.sep) &&
+      relative !== ".." &&
+      !path.isAbsolute(relative))
+  );
+}
+
+async function resolveWorkspacePath(
+  relativePath: string,
+  allowWorkspaceRoot = false
+): Promise<string> {
+  // Tool paths are intentionally relative. Reject Windows drive-relative paths
+  // too (for example, C:notes.txt), because their meaning depends on process state.
+  if (path.isAbsolute(relativePath) || path.win32.parse(relativePath).root !== "") {
+    throw new Error("Path must be relative to the workspace.");
+  }
+
+  const target = path.resolve(WORKSPACE, relativePath);
+
+  if (!isInsideWorkspace(target)) {
+    throw new Error("Path is outside the workspace.");
+  }
+
+  if (target === WORKSPACE && !allowWorkspaceRoot) {
+    throw new Error("The workspace root cannot be used for this operation.");
+  }
+
+  let current = target;
+
+  while (true) {
+    try {
+      const actual = await realpath(current);
+
+      if (!isInsideWorkspace(actual)) {
+        throw new Error("Path resolves outside the workspace.");
+      }
+
+      return path.join(actual, path.relative(current, target));
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message.includes("outside the workspace")) {
+        throw error;
+      }
+
+      // Only a missing path lets us continue upward to find an existing parent.
+      // Permission errors, symlink loops, and I/O failures must not be mistaken
+      // for a safe, nonexistent destination.
+      if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) {
+        throw error;
+      }
+
+      const parent = path.dirname(current);
+
+      if (parent === current) {
+        throw new Error("Could not resolve a safe workspace path.");
+      }
+
+      current = parent;
+    }
+  }
+}
+
 export function createMcpServer() {
+
   const server = new McpServer({
     name: "mcp-file-server",
     version: "1.0.0"
@@ -23,33 +89,18 @@ server.registerTool(
     }
   },
   async ({ path: relativePath }) => {
-    const target = path.resolve(WORKSPACE, relativePath ?? ".");
-
-    if (
-      target !== WORKSPACE &&
-      !target.startsWith(WORKSPACE + path.sep)
-    ) {
-      return {
-        content: [{ type: "text", text: "Error: Path is outside the workspace." }],
-        isError: true
-      };
-    }
+    let target: string;
 
     try {
-      const actualTarget = await realpath(target);
-
-      if (
-        actualTarget !== WORKSPACE &&
-        !actualTarget.startsWith(WORKSPACE + path.sep)
-      ) {
-        return {
-          content: [{ type: "text", text: "Error: Path resolves outside the workspace." }],
-          isError: true
-        };
-      }
-    } catch {
+      target = await resolveWorkspacePath(relativePath ?? ".", true);
+    } catch (error) {
       return {
-        content: [{ type: "text", text: "Error: Folder does not exist or cannot be accessed." }],
+        content: [{
+          type: "text",
+          text: error instanceof Error
+            ? `Error: ${error.message}`
+            : "Error: Folder does not exist or cannot be accessed."
+        }],
         isError: true
       };
     }
@@ -85,45 +136,26 @@ server.registerTool(
     }
   },
   async ({ path: relativePath }) => {
-    const target = path.resolve(WORKSPACE, relativePath);
-
-    if (
-      target !== WORKSPACE &&
-      !target.startsWith(WORKSPACE + path.sep)
-    ) {
-      return {
-        content: [{ type: "text", text: "Error: Path is outside the workspace." }],
-        isError: true
-      };
-    }
-
     try {
-      const actualTarget = await realpath(target);
-
-      if (
-        actualTarget !== WORKSPACE &&
-        !actualTarget.startsWith(WORKSPACE + path.sep)
-      ) {
-        return {
-          content: [{ type: "text", text: "Error: Path resolves outside the workspace." }],
-          isError: true
-        };
-      }
-
-      const contents = await readFile(actualTarget, "utf8");
+      const target = await resolveWorkspacePath(relativePath);
+      const contents = await readFile(target, "utf8");
 
       return {
         content: [{ type: "text", text: contents }]
       };
-    } catch {
+    } catch (error) {
       return {
-        content: [{ type: "text", text: "Error: File does not exist or cannot be read." }],
+        content: [{
+          type: "text",
+          text: error instanceof Error
+            ? `Error: ${error.message}`
+            : "Error: File does not exist or cannot be read."
+        }],
         isError: true
       };
     }
   }
 );
-
 
 server.registerTool(
   "create_file",
@@ -139,30 +171,8 @@ server.registerTool(
     }
   },
   async ({ path: relativePath, content }) => {
-    const target = path.resolve(WORKSPACE, relativePath);
-
-    if (
-      target === WORKSPACE ||
-      !target.startsWith(WORKSPACE + path.sep)
-    ) {
-      return {
-        content: [{ type: "text", text: "Error: Invalid path inside the workspace." }],
-        isError: true
-      };
-    }
-
     try {
-      const parent = await realpath(path.dirname(target));
-
-      if (
-        parent !== WORKSPACE &&
-        !parent.startsWith(WORKSPACE + path.sep)
-      ) {
-        return {
-          content: [{ type: "text", text: "Error: Parent folder is outside the workspace." }],
-          isError: true
-        };
-      }
+      const target = await resolveWorkspacePath(relativePath);
 
       await writeFile(target, content, {
         encoding: "utf8",
@@ -184,7 +194,7 @@ server.registerTool(
           type: "text",
           text: message.includes("EEXIST")
             ? "Error: File already exists. Existing files will not be overwritten."
-            : "Error: Could not create the file. Check the path and parent folder."
+            : `Error: ${message || "Could not create the file. Check the path and parent folder."}`
         }],
         isError: true
       };
@@ -204,41 +214,27 @@ server.registerTool(
     }
   },
   async ({ path: relativePath }) => {
-    const target = path.resolve(WORKSPACE, relativePath);
-
-    if (
-      target === WORKSPACE ||
-      !target.startsWith(WORKSPACE + path.sep)
-    ) {
-      return {
-        content: [{ type: "text", text: "Error: Invalid path inside the workspace." }],
-        isError: true
-      };
-    }
-
     try {
-      const actualTarget = await realpath(target);
+      const requestedPath = path.resolve(WORKSPACE, relativePath);
 
-      if (
-        !actualTarget.startsWith(WORKSPACE + path.sep)
-      ) {
-        return {
-          content: [{ type: "text", text: "Error: Path resolves outside the workspace." }],
-          isError: true
-        };
+      if (!isInsideWorkspace(requestedPath) || requestedPath === WORKSPACE) {
+        throw new Error("Path is outside the workspace or is not a file path.");
       }
 
-      const { lstat } = await import("node:fs/promises");
-      const details = await lstat(actualTarget);
+      const requestedDetails = await lstat(requestedPath);
+
+      if (requestedDetails.isSymbolicLink()) {
+        throw new Error("Symbolic links cannot be deleted.");
+      }
+
+      const target = await resolveWorkspacePath(relativePath);
+      const details = await stat(target);
 
       if (!details.isFile()) {
-        return {
-          content: [{ type: "text", text: "Error: Only files can be deleted." }],
-          isError: true
-        };
+        throw new Error("Only files can be deleted.");
       }
 
-      await unlink(actualTarget);
+      await unlink(target);
 
       return {
         content: [{
@@ -246,18 +242,19 @@ server.registerTool(
           text: `File deleted successfully: ${relativePath}`
         }]
       };
-    } catch {
+    } catch (error) {
       return {
         content: [{
           type: "text",
-          text: "Error: File does not exist or cannot be deleted."
+          text: error instanceof Error
+            ? `Error: ${error.message}`
+            : "Error: File does not exist or cannot be deleted."
         }],
         isError: true
       };
     }
   }
 );
-
 
 server.registerTool(
   "search_files",
@@ -271,14 +268,18 @@ server.registerTool(
     }
   },
   async ({ query, path: relativePath }) => {
-    const target = path.resolve(WORKSPACE, relativePath ?? ".");
+    let target: string;
 
-    if (
-      target !== WORKSPACE &&
-      !target.startsWith(WORKSPACE + path.sep)
-    ) {
+    try {
+      target = await resolveWorkspacePath(relativePath ?? ".", true);
+    } catch (error) {
       return {
-        content: [{ type: "text", text: "Error: Path is outside the workspace." }],
+        content: [{
+          type: "text",
+          text: error instanceof Error
+            ? `Error: ${error.message}`
+            : "Error: Could not search that path."
+        }],
         isError: true
       };
     }
@@ -288,10 +289,7 @@ server.registerTool(
     async function searchFolder(folder: string): Promise<void> {
       const actualFolder = await realpath(folder);
 
-      if (
-        actualFolder !== WORKSPACE &&
-        !actualFolder.startsWith(WORKSPACE + path.sep)
-      ) {
+      if (!isInsideWorkspace(actualFolder)) {
         throw new Error("Path resolves outside workspace.");
       }
 
@@ -334,7 +332,7 @@ server.registerTool(
       } else {
         const actualTarget = await realpath(target);
 
-        if (!actualTarget.startsWith(WORKSPACE + path.sep)) {
+        if (!isInsideWorkspace(actualTarget)) {
           return {
             content: [{ type: "text", text: "Error: Path resolves outside the workspace." }],
             isError: true
@@ -379,28 +377,8 @@ server.registerTool(
     }
   },
   async ({ path: relativePath }) => {
-    const target = path.resolve(WORKSPACE, relativePath);
-
-    if (
-      target === WORKSPACE ||
-      !target.startsWith(WORKSPACE + path.sep)
-    ) {
-      return {
-        content: [{ type: "text", text: "Error: Invalid path inside the workspace." }],
-        isError: true
-      };
-    }
-
     try {
-      const actualTarget = await realpath(target);
-
-      if (!actualTarget.startsWith(WORKSPACE + path.sep)) {
-        return {
-          content: [{ type: "text", text: "Error: Path resolves outside the workspace." }],
-          isError: true
-        };
-      }
-
+      const actualTarget = await resolveWorkspacePath(relativePath);
       const details = await stat(actualTarget);
 
       return {
@@ -415,15 +393,19 @@ server.registerTool(
           ].join("\n")
         }]
       };
-    } catch {
+    } catch (error) {
       return {
-        content: [{ type: "text", text: "Error: File or folder does not exist or cannot be accessed." }],
+        content: [{
+          type: "text",
+          text: error instanceof Error
+            ? `Error: ${error.message}`
+            : "Error: File or folder does not exist or cannot be accessed."
+        }],
         isError: true
       };
     }
   }
 );
-
 
 server.registerTool(
   "create_directory",
@@ -436,30 +418,8 @@ server.registerTool(
     }
   },
   async ({ path: relativePath }) => {
-    const target = path.resolve(WORKSPACE, relativePath);
-
-    if (
-      target === WORKSPACE ||
-      !target.startsWith(WORKSPACE + path.sep)
-    ) {
-      return {
-        content: [{ type: "text", text: "Error: Invalid directory path." }],
-        isError: true
-      };
-    }
-
     try {
-      const parent = await realpath(path.dirname(target));
-
-      if (
-        parent !== WORKSPACE &&
-        !parent.startsWith(WORKSPACE + path.sep)
-      ) {
-        return {
-          content: [{ type: "text", text: "Error: Parent folder is outside the workspace." }],
-          isError: true
-        };
-      }
+      const target = await resolveWorkspacePath(relativePath);
 
       await mkdir(target);
 
@@ -477,14 +437,13 @@ server.registerTool(
           type: "text",
           text: message.includes("EEXIST")
             ? "Error: Directory or file already exists at that path."
-            : "Error: Could not create the directory. Check the parent folder and path."
+            : `Error: ${message || "Could not create the directory. Check the parent folder and path."}`
         }],
         isError: true
       };
     }
   }
 );
-
 
 server.registerTool(
   "move_file",
@@ -500,42 +459,9 @@ server.registerTool(
     }
   },
   async ({ source, destination }) => {
-    const sourcePath = path.resolve(WORKSPACE, source);
-    const destinationPath = path.resolve(WORKSPACE, destination);
-
-    const isInsideWorkspace = (target: string) =>
-      target.startsWith(WORKSPACE + path.sep);
-
-    if (
-      !isInsideWorkspace(sourcePath) ||
-      !isInsideWorkspace(destinationPath)
-    ) {
-      return {
-        content: [{
-          type: "text",
-          text: "Error: Both paths must be inside the workspace."
-        }],
-        isError: true
-      };
-    }
-
     try {
-      const actualSource = await realpath(sourcePath);
-      const actualParent = await realpath(path.dirname(destinationPath));
-
-      if (
-        !isInsideWorkspace(actualSource) ||
-        !isInsideWorkspace(actualParent)
-      ) {
-        return {
-          content: [{
-            type: "text",
-            text: "Error: Source or destination resolves outside the workspace."
-          }],
-          isError: true
-        };
-      }
-
+      const actualSource = await resolveWorkspacePath(source);
+      const finalDestination = await resolveWorkspacePath(destination);
       const sourceDetails = await stat(actualSource);
 
       if (!sourceDetails.isFile()) {
@@ -548,14 +474,7 @@ server.registerTool(
         };
       }
 
-      const finalDestination = path.join(
-        actualParent,
-        path.basename(destinationPath)
-      );
-
-      if (
-        finalDestination === actualSource
-      ) {
+      if (actualSource === finalDestination) {
         return {
           content: [{
             type: "text",
@@ -565,27 +484,26 @@ server.registerTool(
         };
       }
 
+      // link() creates the destination only when it does not already exist.
+      // Unlike a separate existence check followed by rename(), it cannot
+      // overwrite a file created by another request in between those steps.
       try {
-        await stat(finalDestination);
-
-        return {
-          content: [{
-            type: "text",
-            text: "Error: A file or folder already exists at the destination."
-          }],
-          isError: true
-        };
+        await link(actualSource, finalDestination);
       } catch (error) {
-        if (
-          error instanceof Error &&
-          "code" in error &&
-          error.code !== "ENOENT"
-        ) {
-          throw error;
+        if (error && typeof error === "object" && "code" in error && error.code === "EEXIST") {
+          return {
+            content: [{
+              type: "text",
+              text: "Error: A file or folder already exists at the destination."
+            }],
+            isError: true
+          };
         }
+
+        throw error;
       }
 
-      await rename(actualSource, finalDestination);
+      await unlink(actualSource);
 
       return {
         content: [{
@@ -593,11 +511,13 @@ server.registerTool(
           text: `File moved successfully: ${source} -> ${destination}`
         }]
       };
-    } catch {
+    } catch (error) {
       return {
         content: [{
           type: "text",
-          text: "Error: Could not move the file. Check that the source exists and the destination folder already exists."
+          text: error instanceof Error
+            ? `Error: ${error.message}`
+            : "Error: Could not move the file."
         }],
         isError: true
       };
@@ -622,37 +542,9 @@ server.registerTool(
     }
   },
   async ({ path: relativePath, old_text, new_text }) => {
-    const target = path.resolve(WORKSPACE, relativePath);
-
-    if (
-      target === WORKSPACE ||
-      !target.startsWith(WORKSPACE + path.sep)
-    ) {
-      return {
-        content: [{
-          type: "text",
-          text: "Error: Path is outside the workspace or is not a file path."
-        }],
-        isError: true
-      };
-    }
-
     try {
-      const actualTarget = await realpath(target);
-
-      if (
-        !actualTarget.startsWith(WORKSPACE + path.sep)
-      ) {
-        return {
-          content: [{
-            type: "text",
-            text: "Error: Path resolves outside the workspace."
-          }],
-          isError: true
-        };
-      }
-
-      const fileInfo = await stat(actualTarget);
+      const target = await resolveWorkspacePath(relativePath);
+      const fileInfo = await stat(target);
 
       if (!fileInfo.isFile()) {
         return {
@@ -664,7 +556,7 @@ server.registerTool(
         };
       }
 
-      const contents = await readFile(actualTarget, "utf8");
+      const contents = await readFile(target, "utf8");
       const firstIndex = contents.indexOf(old_text);
 
       if (firstIndex === -1) {
@@ -692,7 +584,7 @@ server.registerTool(
         new_text +
         contents.slice(firstIndex + old_text.length);
 
-      await writeFile(actualTarget, updatedContents, "utf8");
+      await writeFile(target, updatedContents, "utf8");
 
       return {
         content: [{
@@ -700,11 +592,13 @@ server.registerTool(
           text: "Text replaced successfully."
         }]
       };
-    } catch {
+    } catch (error) {
       return {
         content: [{
           type: "text",
-          text: "Error: Could not safely read or update the file."
+          text: error instanceof Error
+            ? `Error: ${error.message}`
+            : "Error: Could not safely read or update the file."
         }],
         isError: true
       };

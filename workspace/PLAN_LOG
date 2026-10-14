@@ -17,11 +17,13 @@ COMPLETED
 COMPLETED
 - Created and reviewed PROJECT_STATE, PLAN_LOG, CHECKPOINTS, and DECISIONS.
 
-IN PROGRESS
-- Security review before public deployment.
+COMPLETED
+- Completed local security audit on 2026-10-15.
+- Added focused MCP integration tests for all nine registrations, normal file operations, traversal rejection, outside-workspace symlink rejection, and move destination preservation.
+- Verified `npx.cmd tsc --noEmit` and `npm.cmd test` pass.
+- Kept the HTTP service loopback-bound with required Bearer-token authentication; documented the explicit `MCP_ALLOWED_ORIGINS` setting needed for an HTTPS tunnel.
 
 PLANNED
-- Review path validation and file-operation edge cases.
 - Configure and test an HTTPS tunnel.
 - Configure PM2 to manage the server process.
 - Publish the repository to GitHub after checking for secrets.

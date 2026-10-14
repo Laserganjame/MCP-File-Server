@@ -34,3 +34,12 @@ Status: Final tunnel and process-manager configuration not yet selected or verif
 8. DOCUMENTATION
 Decision: Keep project state, progress, checkpoints, and design decisions in separate handoff files.
 Reason: Allow another AI agent or session to resume work reliably.
+
+9. PATH AND MOVE SAFETY
+Decision: Resolve the nearest existing filesystem ancestor with realpath, reject paths that resolve outside the workspace, and use link-then-unlink for moves.
+Reason: This blocks traversal and escaping symlinks while preventing move_file from overwriting a destination created between a pre-check and rename.
+Limitation: The Node path-based APIs cannot fully prevent races if another untrusted local process changes workspace paths concurrently; filesystem permissions remain part of the security boundary.
+
+10. TUNNEL ORIGINS
+Decision: Keep local HTTP Origins allowed by default and require each non-local browser Origin to be listed in MCP_ALLOWED_ORIGINS.
+Reason: An HTTPS tunnel has a non-local Origin, but accepting arbitrary Origins would weaken browser-request protection.
