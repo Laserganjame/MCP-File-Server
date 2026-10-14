@@ -605,5 +605,112 @@ server.registerTool(
   }
 );
 
+server.registerTool(
+  "str_replace",
+  {
+    description: "Replace one exact occurrence of text in a workspace file.",
+    inputSchema: {
+      path: z.string().describe(
+        "Relative file path inside the workspace."
+      ),
+      old_text: z.string().min(1).describe(
+        "The exact, non-empty text to find."
+      ),
+      new_text: z.string().describe(
+        "The replacement text."
+      )
+    }
+  },
+  async ({ path: relativePath, old_text, new_text }) => {
+    const target = path.resolve(WORKSPACE, relativePath);
+
+    if (
+      target === WORKSPACE ||
+      !target.startsWith(WORKSPACE + path.sep)
+    ) {
+      return {
+        content: [{
+          type: "text",
+          text: "Error: Path is outside the workspace or is not a file path."
+        }],
+        isError: true
+      };
+    }
+
+    try {
+      const actualTarget = await realpath(target);
+
+      if (
+        !actualTarget.startsWith(WORKSPACE + path.sep)
+      ) {
+        return {
+          content: [{
+            type: "text",
+            text: "Error: Path resolves outside the workspace."
+          }],
+          isError: true
+        };
+      }
+
+      const fileInfo = await stat(actualTarget);
+
+      if (!fileInfo.isFile()) {
+        return {
+          content: [{
+            type: "text",
+            text: "Error: Target must be a regular file."
+          }],
+          isError: true
+        };
+      }
+
+      const contents = await readFile(actualTarget, "utf8");
+      const firstIndex = contents.indexOf(old_text);
+
+      if (firstIndex === -1) {
+        return {
+          content: [{
+            type: "text",
+            text: "Error: The target text was not found. File unchanged."
+          }],
+          isError: true
+        };
+      }
+
+      if (contents.indexOf(old_text, firstIndex + old_text.length) !== -1) {
+        return {
+          content: [{
+            type: "text",
+            text: "Error: The target text appears more than once. File unchanged."
+          }],
+          isError: true
+        };
+      }
+
+      const updatedContents =
+        contents.slice(0, firstIndex) +
+        new_text +
+        contents.slice(firstIndex + old_text.length);
+
+      await writeFile(actualTarget, updatedContents, "utf8");
+
+      return {
+        content: [{
+          type: "text",
+          text: "Text replaced successfully."
+        }]
+      };
+    } catch {
+      return {
+        content: [{
+          type: "text",
+          text: "Error: Could not safely read or update the file."
+        }],
+        isError: true
+      };
+    }
+  }
+);
+
   return server;
 }
