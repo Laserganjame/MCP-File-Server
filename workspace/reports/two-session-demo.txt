@@ -1,0 +1,1 @@
+Created in MCP Session 1; read in MCP Session 2. Cross-session persistence verified.

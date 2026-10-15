@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start:http": "tsx src/http.ts",
     "test": "tsx --test test/**/*.test.ts"
   },
   "keywords": [],
