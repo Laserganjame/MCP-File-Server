@@ -1,5 +1,5 @@
 ﻿PROJECT: MCP File Server
-STATUS: Local implementation working; deployment and documentation pending.
+STATUS: Local implementation working; PM2, health checks, MCP transport probes, and the two-session public HTTPS demonstration verified; GitHub publication still requires completion.
 
 PURPOSE
 Provide an AI agent with authenticated MCP tools for managing files inside a restricted workspace.
@@ -17,27 +17,25 @@ CURRENT IMPLEMENTATION
 - Health endpoint: http://127.0.0.1:3000/health
 - Bearer-token authentication using MCP_AUTH_TOKEN.
 - Workspace root: workspace/
-- MCP Inspector successfully connected and tested all nine tools.
+- MCP Inspector CLI connected to the public endpoint and listed all nine tools; discovery is not the same as executing every tool remotely.
 - Path traversal attempts were rejected in earlier tests.
 - TypeScript check passed using npx.cmd tsc --noEmit.
 - Security audit verified locally on 2026-10-15: all nine tools register, traversal and outside-workspace symlink attempts are rejected, and move_file preserves an existing destination.
+- Final readiness audit verified on 2026-10-15: PM2 reported `mcp-file-server` online; local and public health endpoints returned HTTP 200. README and implementation documentation were added.
+- Verified on 2026-10-15: authenticated local and public MCP sessions initialized with HTTP 200 and session IDs; `create_file` returned HTTP 200 and successful tool results for `reports/local-probe-f5ba9f6499c04bf1a7dae407fbd868eb.txt` and `reports/public-probe-198e2b5a01f947b9945915a673be825b.txt`.
+- Verified two-session public HTTPS demonstration on 2026-10-15: Session 1 created `reports/two-session-demo.txt`; independently initialized Session 2 read the exact content with HTTP 200. Sanitized evidence: `workspace/reports/two-session-demo-evidence.md`.
 
 GIT HISTORY
 - 33ffc95: feat: add safe exact-text replacement tool
 - bf58023: establish working MCP file server baseline
 
 CURRENT LIMITATIONS
-- HTTPS tunnel and PM2 process management are not yet completed.
 - Required handoff files created and verified.
-- README and documentation paper are pending.
-- Multi-step demonstration across at least two agent sessions is pending.
-- Final deployment and remote-client security testing are required.
+- Intermittent Inspector CLI `fetch failed / other side closed` errors remain unexplained and are not considered fixed.
+- Complete remote MCP evidence for all nine tools has not been captured. The verified public calls cover `create_file` and `read_file`; Inspector tool discovery is not remote execution of all nine tools.
+- No Git remote was configured during this audit, so public GitHub publication remains pending.
 - Filesystem path checks cannot eliminate every time-of-check/time-of-use race if an untrusted local process can modify the workspace concurrently. Keep workspace write access limited to the server account and trusted users.
 
 NEXT PRIORITIES
-1. Complete and verify handoff files.
-2. Review tool security and test edge cases.
-3. Configure HTTPS tunnel and PM2.
-4. Publish the reviewed repository to GitHub.
-5. Complete a multi-session agent demonstration and save evidence.
-6. Finish the README and documentation paper.
+1. Exercise and capture the remaining remote tools using a token-capable MCP client.
+2. Create and publish the reviewed GitHub repository.

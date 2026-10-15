@@ -22,14 +22,17 @@ COMPLETED
 - Added focused MCP integration tests for all nine registrations, normal file operations, traversal rejection, outside-workspace symlink rejection, and move destination preservation.
 - Verified `npx.cmd tsc --noEmit` and `npm.cmd test` pass.
 - Kept the HTTP service loopback-bound with required Bearer-token authentication; documented the explicit `MCP_ALLOWED_ORIGINS` setting needed for an HTTPS tunnel.
+- Final readiness audit on 2026-10-15: `pm2.cmd status` reported `mcp-file-server` online; local and public health checks returned HTTP 200; compilation, automated tests, and production dependency audit passed.
+- Added README.md and DOCUMENTATION.md based on the inspected implementation and verified audit results.
+- Verified local and public MCP transport on 2026-10-15: each initialize request returned HTTP 200 with a session ID, and each `create_file` request returned HTTP 200 with a successful tool result. The probe files are preserved under `workspace/reports/`.
+- Completed the two-session public HTTPS MCP demonstration on 2026-10-15: independently initialized Session 1 created `reports/two-session-demo.txt`, and independently initialized Session 2 read its exact content with HTTP 200. Sanitized evidence is in `workspace/reports/two-session-demo-evidence.md`.
+
+IN PROGRESS
+- Capture complete remote MCP evidence with a token-capable client. Inspector discovery and the verified public `create_file`/`read_file` calls do not show that every tool has been exercised remotely.
+- Investigate the intermittent Inspector CLI `fetch failed / other side closed` error only when it can be captured with a timestamp and client-side details; it remains unexplained.
 
 PLANNED
-- Configure and test an HTTPS tunnel.
-- Configure PM2 to manage the server process.
 - Publish the repository to GitHub after checking for secrets.
-- Demonstrate a multi-step task across at least two agent sessions.
-- Save transcripts and logs as grading evidence.
-- Complete README and documentation paper.
 
 RULE
 Record meaningful completed work and test results here. Do not mark a task complete until it has been verified.
